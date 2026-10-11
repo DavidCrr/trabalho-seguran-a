@@ -1,0 +1,88 @@
+
+services:
+  firewall:
+    build:
+      context: ./firewall
+    container_name: medtech-firewall
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      lan:
+        ipv4_address: 172.20.0.2
+      dmz:
+        ipv4_address: 172.21.0.2
+      rede_db:
+        ipv4_address: 172.22.0.2
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+    container_name: medtech-client
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.20.0.10
+    depends_on:
+      - firewall
+    volumes:
+      - ./client/configurar-rede.sh:/configurar-rede.sh:ro
+    command: ["sh", "-c", "sh /configurar-rede.sh && sleep infinity"]
+
+  
+  web:
+    image: nginx:alpine
+    container_name: medtech-web
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+    networks:
+      dmz:
+        ipv4_address: 172.21.0.10
+    command: ["sh", "-c", "ip route replace default via 172.21.0.2 && exec nginx -g 'daemon off;'"]
+    restart: unless-stopped
+
+  database:
+    image: postgres:16-alpine
+    container_name: medtech-database
+    environment:
+      POSTGRES_DB: medtech
+      POSTGRES_USER: medtech_user
+      POSTGRES_PASSWORD: medtech_demo_2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      rede_db:
+        ipv4_address: 172.22.0.20
+    restart: unless-stopped
+
+networks:
+  lan:
+    name: medtech-lan
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+  dmz:
+    name: medtech-dmz
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+
+  rede_db:
+    name: medtech-rede-db
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+
+volumes:
+  postgres_data:
