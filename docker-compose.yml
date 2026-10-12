@@ -15,8 +15,10 @@ services:
         ipv4_address: 172.21.0.2
       rede_db:
         ipv4_address: 172.22.0.2
+      wan:
+        ipv4_address: 172.23.0.2
     restart: unless-stopped
-
+    
   client:
     build:
       context: ./client
@@ -32,6 +34,19 @@ services:
       - ./client/configurar-rede.sh:/configurar-rede.sh:ro
     command: ["sh", "-c", "sh /configurar-rede.sh && sleep infinity"]
 
+  pharmacy:
+    build: ./client
+    container_name: medtech-pharmacy
+    cap_add:
+      - NET_ADMIN
+    networks:
+      wan:
+        ipv4_address: 172.23.0.10
+    depends_on:
+      - firewall
+    command: >
+      sh -c "ip route replace default via 172.23.0.2 &&
+             sleep infinity"
   
   web:
     image: nginx:alpine
@@ -83,6 +98,11 @@ networks:
     ipam:
       config:
         - subnet: 172.22.0.0/24
-
+  wan:
+    name: medtech-wan
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/24
 volumes:
   postgres_data:
