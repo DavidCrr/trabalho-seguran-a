@@ -239,6 +239,7 @@ docker-compose.yml. O Docker Desktop deve estar em execução.
   5. Testar HTTP pela LAN: docker compose exec client wget -qO- http://172.21.0.10.
   6. Testar acesso da LAN ao PostgreSQL: docker compose exec client sh -c "nc -zvw 3 172.22.0.20 5432".
   7. Consultar logs: docker compose logs --tail=50 firewall.
+  8. Testar isolamento da DMZ: docker compose exec web wget -T 3 -S -O /dev/null http://172.20.0.10.
 
 5.2 Testes positivos
 
@@ -268,6 +269,9 @@ Teste                Procedimento         Resultado esperado Resultado observado
 LAN tenta acessar    nc -zvw 3            Conexão não        Aprovado: tentativa
 PostgreSQL           172.22.0.20 5432     estabelecida       expirou com       
                      no container client                     "Operation timed out".
+Isolamento DMZ       wget no container    Conexão não        Aprovado: tentativa
+(DMZ tenta acessar   web p/ 172.20.0.10   estabelecida       expirou com        
+LAN)                                                         "download timed out".
 Política             Consultar iptables   Pacotes sem        Aprovado: política
 restritiva           -L FORWARD -n -v     permissão descartados DROP e descartes  
                                                              observados no contador.

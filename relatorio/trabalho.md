@@ -243,7 +243,21 @@ Depois da recriação, foi consultado o estado dos contêineres e das regras do 
 
 **Interpretação:** o teste confirmou que a configuração das regras é executada automaticamente pelo script `firewall/entrypoint.sh` durante a inicialização do contêiner. Isso evita a necessidade de inserir manualmente as regras a cada recriação do ambiente.
 
-### 6.7. Resumo dos resultados
+### 6.7. Teste 7 — Isolamento da DMZ (tentativa de conexão com a LAN)
+
+**Objetivo:** verificar se o servidor web na DMZ está impedido de iniciar novas conexões em direção à rede interna (LAN).
+
+Comando utilizado:
+
+```bash
+docker compose exec web wget -T 3 -S -O /dev/null http://172.20.0.10
+```
+
+**Resultado:** a tentativa resultou em timeout (`download timed out`), sem estabelecer conexão.
+
+**Interpretação:** confirma o isolamento da DMZ, impedindo conexões originadas no servidor web para a LAN, enquanto conexões de retorno autorizadas (`ESTABLISHED,RELATED`) continuam permitidas.
+
+### 6.8. Resumo dos resultados
 
 | Teste                          | Resultado                                              | Avaliação                                                                                     |
 | ------------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
@@ -253,6 +267,7 @@ Depois da recriação, foi consultado o estado dos contêineres e das regras do 
 | Web → banco, TCP 5432          | Timeout                                                | Compatível com o bloqueio esperado; requer teste específico de TCP para confirmação adicional |
 | Contadores do `FORWARD`        | 3 pacotes e 180 bytes descartados pela política padrão | Evidência adicional de descarte                                                               |
 | Reinicialização do ambiente    | Regras reaplicadas automaticamente                     | Aprovado                                                                                      |
+| Web → LAN (Isolamento da DMZ)  | Timeout                                                | Aprovado (novas conexões bloqueadas)                                                          |
 
 ## 7. Conclusão
 

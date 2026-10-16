@@ -122,7 +122,15 @@ docker compose exec client sh -c "nc -zvw 3 172.22.0.20 5432"
 
 **Resultado esperado:** a conexão expira ou falha, demonstrando que o acesso direto ao banco não está autorizado pelas regras de encaminhamento.
 
-### 7.4 Verificação das regras
+### 7.4 Teste negativo: isolamento da DMZ em direção à LAN
+
+```bash
+docker compose exec web wget -T 3 -S -O /dev/null http://172.20.0.10
+```
+
+**Resultado esperado:** a conexão expira por timeout (`download timed out`), confirmando que a DMZ não pode iniciar conexões com a rede interna.
+
+### 7.5 Verificação das regras
 
 Consultar as regras de encaminhamento:
 
