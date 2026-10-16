@@ -18,7 +18,7 @@ services:
       wan:
         ipv4_address: 172.23.0.2
     restart: unless-stopped
-    
+
   client:
     build:
       context: ./client
@@ -47,20 +47,17 @@ services:
     command: >
       sh -c "ip route replace default via 172.23.0.2 &&
              sleep infinity"
-  
+
   web:
     image: nginx:alpine
     container_name: medtech-web
-    cap_add:
-      - NET_ADMIN
     volumes:
       - ./web:/usr/share/nginx/html:ro
     networks:
       dmz:
         ipv4_address: 172.21.0.10
-    command: ["sh", "-c", "ip route replace default via 172.21.0.2 && exec nginx -g 'daemon off;'"]
     restart: unless-stopped
-
+    
   database:
     image: postgres:16-alpine
     container_name: medtech-database

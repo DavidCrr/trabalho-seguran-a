@@ -22,6 +22,13 @@ iptables -A FORWARD \
   --ctstate ESTABLISHED,RELATED \
   -j ACCEPT
 
+# Bloqueia novas conexões iniciadas pela DMZ em direção à LAN
+iptables -A FORWARD \
+  -s 172.21.0.0/24 \
+  -d 172.20.0.0/24 \
+  -m conntrack --ctstate NEW \
+  -j DROP
+
 # Permite a LAN acessar o servidor web na porta HTTP 80
 iptables -A FORWARD \
   -s 172.20.0.0/24 \
@@ -37,6 +44,25 @@ iptables -A FORWARD \
   -p tcp --dport 80 \
   -m conntrack --ctstate NEW \
   -j ACCEPT
+
+# SNAT: permite que o Nginx responda pelo firewall
+# LAN interna -> Nginx na DMZ
+iptables -t nat -A POSTROUTING \
+  -s 172.20.0.0/24 \
+  -d 172.21.0.10 \
+  -p tcp --dport 80 \
+  -j SNAT --to-source 172.21.0.2
+
+# WAN simulada -> Nginx na DMZ
+iptables -t nat -A POSTROUTING \
+  -s 172.23.0.0/24 \
+  -d 172.21.0.10 \
+  -p tcp --dport 80 \
+  -j SNAT --to-source 172.21.0.2
+
+echo "[MedTech Firewall] Regras NAT aplicadas:"
+iptables -t nat -L POSTROUTING -n -v
+
 
 echo "[MedTech Firewall] Regras aplicadas:"
 iptables -L FORWARD -n -v

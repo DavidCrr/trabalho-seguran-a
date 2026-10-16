@@ -25,6 +25,7 @@ O ambiente é dividido em quatro segmentos de rede:
 
 * **LAN → DMZ:** acesso HTTP permitido ao portal Web.
 * **WAN simulada → DMZ:** acesso HTTP permitido para simular o acesso externo ao portal.
+* **DMZ → LAN:** novas conexões bloqueadas (isolamento da DMZ).
 * **LAN → banco de dados:** acesso direto bloqueado pelas regras de encaminhamento.
 * **WAN simulada → banco de dados:** acesso direto não autorizado.
 * **Tráfego de retorno:** conexões estabelecidas e relacionadas são permitidas pelas regras do firewall.
@@ -56,10 +57,13 @@ O firewall utiliza uma política padrão de bloqueio para o encaminhamento de pa
 | Conexões estabelecidas ou relacionadas     | Redes encaminhadas pelo firewall | Conforme conexão original | Permitir                                    |
 | LAN                                        | Servidor Web na DMZ              | TCP/80 (HTTP)             | Permitir                                    |
 | WAN simulada                               | Servidor Web na DMZ              | TCP/80 (HTTP)             | Permitir                                    |
+| DMZ                                        | LAN (Intranet)                   | Qualquer                  | Bloquear novas conexões                     |
 | LAN ou WAN simulada                        | Banco de dados                   | Acesso direto             | Bloquear por ausência de regra de permissão |
 | Outros fluxos encaminhados não autorizados | Qualquer destino                 | Qualquer serviço          | Bloquear pela política padrão               |
 
 O bloqueio de acesso ao banco de dados decorre da política padrão de encaminhamento, não de uma regra específica de bloqueio da porta 5432.
+
+**Isolamento da DMZ:** o servidor Web localizado na DMZ não pode iniciar conexões em direção à rede interna (LAN). Essa restrição reduz o risco de que um servidor comprometido seja utilizado para acessar estações de trabalho internas. O firewall permite o tráfego de retorno de conexões previamente estabelecidas e autorizadas, mas não libera novas conexões originadas na DMZ em direção à Intranet.
 
 ## 6. Como executar
 

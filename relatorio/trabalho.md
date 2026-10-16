@@ -50,7 +50,8 @@ Foram implementadas as seguintes regras principais:
 
 1. Permitir pacotes relacionados a conexões já estabelecidas.
 2. Permitir novas conexões HTTP originadas na LAN e destinadas ao servidor web da DMZ, pela porta TCP 80.
-3. Descartar, pela política padrão, os demais pacotes encaminhados que não possuam uma regra de autorização correspondente.
+3. Bloquear novas conexões iniciadas pela DMZ em direção à LAN (isolamento da DMZ).
+4. Descartar, pela política padrão, os demais pacotes encaminhados que não possuam uma regra de autorização correspondente.
 
 As regras são configuradas pelo script `firewall/entrypoint.sh` durante a inicialização do contêiner, permitindo sua aplicação automática após a recriação do ambiente.
 
@@ -123,6 +124,7 @@ A matriz apresenta as principais políticas implementadas para o tráfego encami
 | -------------------------------------- | ---------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
 | LAN — 172.20.0.0/24                    | Web — 172.21.0.10            | HTTP, TCP 80                                        | Permitir novas conexões                                         |
 | Qualquer origem encaminhada            | Qualquer destino encaminhado | Respostas de conexões estabelecidas ou relacionadas | Permitir                                                        |
+| DMZ — 172.21.0.0/24                    | LAN — 172.20.0.0/24          | Qualquer (novas conexões)                           | Bloquear novas conexões (DROP)                                  |
 | Web — 172.21.0.10                      | Banco — 172.22.0.20          | PostgreSQL, TCP 5432                                | Bloqueado pela política padrão, na ausência de regra específica |
 | Demais origens e destinos encaminhados | Demais serviços              | Não autorizado explicitamente                       | Bloquear por padrão                                             |
 
@@ -131,6 +133,8 @@ A política padrão da cadeia `FORWARD` é `DROP`. Isso significa que o tráfego
 A regra `ESTABLISHED,RELATED` permite o tráfego de retorno associado a conexões existentes ou relacionadas. Ela não concede, por si só, autorização para iniciar qualquer nova conexão.
 
 A regra HTTP autoriza novas conexões TCP com destino ao endereço `172.21.0.10`, na porta 80, quando originadas na sub-rede LAN `172.20.0.0/24`.
+
+**Isolamento da DMZ:** o servidor Web localizado na DMZ não pode iniciar conexões em direção à rede interna (LAN). Essa restrição reduz o risco de que um servidor comprometido seja utilizado para acessar estações de trabalho internas. O firewall permite o tráfego de retorno de conexões previamente estabelecidas e autorizadas, mas não libera novas conexões originadas na DMZ em direção à Intranet.
 
 **Limitação importante:** a matriz descreve as regras implementadas na cadeia `FORWARD`. Ela não representa uma auditoria completa de todas as cadeias do iptables, como `INPUT` e `OUTPUT`, nem de todas as possíveis formas de comunicação dentro de cada segmento.
 

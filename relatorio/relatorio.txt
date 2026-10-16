@@ -1,0 +1,320 @@
+                            INSTITUTO FEDERAL GOIANO
+                                  CAMPUS CERES
+                     BACHARELADO EM SISTEMAS DE INFORMAÇÃO
+
+
+
+
+
+
+
+
+
+                              DAVID CORREA DUARTE
+
+
+
+
+
+
+
+
+
+              MEDTECH FIREWALL: SEGMENTAÇÃO DE REDE E CONTROLE DE
+                              TRÁFEGO COM IPTABLES
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                   CERES – GO
+                                      2026
+
+                              DAVID CORREA DUARTE
+
+
+
+
+
+
+
+              MEDTECH FIREWALL: SEGMENTAÇÃO DE REDE E CONTROLE DE
+                              TRÁFEGO COM IPTABLES
+
+
+
+
+
+                                          Relatório técnico apresentado ao curso
+                                          de Bacharelado em Sistemas de
+                                          Informação do Instituto Federal Goiano
+                                          – Campus Ceres, como parte dos
+                                          requisitos da atividade acadêmica de
+                                          Segurança da Informação/Redes.
+
+                                          Professor(a): Roitier Campos Gonçalves.
+
+
+
+
+
+
+
+
+
+                                   CERES – GO
+                                      2026
+
+                                    SUMÁRIO
+
+1 INTRODUÇÃO ........................................................... 4
+2 DEFINIÇÃO DO CASE .................................................... 4
+  2.1 Descrição da organização e contexto .............................. 4
+  2.2 Serviços necessários ............................................. 4
+  2.3 Topologia e endereçamento ........................................ 5
+3 DIAGNÓSTICO: CENÁRIO ATUAL E PROPOSTA DE SOLUÇÃO .................... 5
+  3.1 Cenário atual: problemas mapeados ................................ 5
+  3.2 Proposta de solução .............................................. 5
+4 MATRIZ DE REGRAS DE SEGURANÇA DO FIREWALL ............................ 6
+  4.1 Tradução de endereços (SNAT) ..................................... 7
+5 METODOLOGIA DE TESTES E VALIDAÇÃO .................................... 7
+  5.1 Passo a passo para o avaliador ................................... 7
+  5.2 Testes positivos ................................................. 8
+  5.3 Testes negativos ................................................. 8
+  5.4 Critérios de validação ........................................... 9
+6 CONSIDERAÇÕES FINAIS ................................................. 9
+REFERÊNCIAS ............................................................ 10
+
+1 INTRODUÇÃO
+
+     Este relatório apresenta o planejamento, a implementação e a validação do
+MedTech Firewall, ambiente acadêmico demonstrativo de segurança de redes. O
+projeto simula uma distribuidora farmacêutica, separando usuários internos,
+serviço web, banco de dados e uma rede externa simulada.
+
+     A solução utiliza Docker Compose e um container Linux dedicado ao
+encaminhamento IPv4 e à aplicação de regras com iptables. A política principal é
+negar por padrão o tráfego encaminhado e permitir somente os fluxos necessários
+ao serviço web.
+
+2 DEFINIÇÃO DO CASE
+
+2.1 Descrição da organização e contexto
+
+     A MedTech é uma organização hipotética inspirada na realidade de uma
+distribuidora farmacêutica. Colaboradores internos precisam acessar um portal
+demonstrativo relacionado a pedidos. Um banco PostgreSQL representa o
+armazenamento de dados, enquanto uma rede externa simulada representa um
+parceiro, filial ou usuário que acessa o portal de fora da rede interna.
+
+     O portal implementado é uma página HTML estática servida pelo Nginx.
+Portanto, este projeto demonstra segmentação, encaminhamento e filtragem de
+tráfego, mas não implementa uma aplicação de pedidos integrada ao banco de
+dados.
+
+2.2 Serviços necessários
+
+  - Cliente interno (client): estação de trabalho da LAN.
+  - Servidor web Nginx (web): portal HTTP na porta TCP 80, localizado na DMZ.
+  - Banco PostgreSQL (database): armazenamento interno, porta TCP 5432.
+  - Cliente externo simulado (pharmacy): origem de testes da WAN simulada.
+  - Firewall Linux (firewall): encaminha pacotes IPv4 e aplica regras iptables.
+
+2.3 Topologia e endereçamento
+
+     A infraestrutura utiliza quatro redes Docker. O container de firewall
+possui uma interface em cada segmento; os demais serviços são conectados às
+redes necessárias à sua função.
+
+3 DIAGNÓSTICO: CENÁRIO ATUAL E PROPOSTA DE SOLUÇÃO
+
+3.1 Cenário atual: problemas mapeados
+
+     Em uma rede sem segmentação e sem filtragem centralizada, estações de
+trabalho, serviços publicados e bancos de dados podem ficar expostos a
+comunicações desnecessárias. Isso amplia a superfície de ataque, pode facilitar
+movimentação lateral após o comprometimento de um equipamento e dificulta
+aplicar o princípio do menor privilégio.
+
+     Os riscos considerados neste estudo são: acesso direto de clientes ao
+banco; falta de separação lógica entre serviço web e dados; encaminhamento sem
+política padrão restritiva; e permissões amplas. Esses itens descrevem o cenário
+de risco usado para justificar a proposta, não uma auditoria de empresa real.
+
+3.2 Proposta de solução
+
+     A arquitetura separa LAN, DMZ, rede de banco de dados e WAN simulada. O
+servidor web fica na DMZ, zona destinada a serviços que recebem conexões de
+outras redes. O PostgreSQL fica em uma rede própria, configurada como interna no
+Docker, sem regra que autorize o acesso direto dos clientes ao banco.
+
+     O firewall habilita o encaminhamento IPv4 e aplica política padrão DROP à
+cadeia FORWARD. São permitidas conexões ESTABLISHED,RELATED e novas conexões
+HTTP/TCP 80 da LAN e da WAN simulada para o servidor web. Duas regras SNAT
+traduzem a origem dessas conexões para 172.21.0.2, endereço do firewall na DMZ,
+permitindo que as respostas do Nginx retornem pelo firewall.
+
+     A negação por padrão segue o princípio do menor privilégio. O SNAT é uma
+solução funcional para este laboratório; como consequência, os registros do
+Nginx podem mostrar o endereço do firewall como origem, em vez do endereço
+original do cliente.
+
+Tabela 1 – Topologia e endereçamento
+--------------------------------------------------------------------------------
+Segmento        Rede             Equipamentos e endereços   Finalidade          
+--------------------------------------------------------------------------------
+LAN             172.20.0.0/24    Firewall 172.20.0.2;       Estações internas   
+                                 client 172.20.0.10                             
+DMZ             172.21.0.0/24    Firewall 172.21.0.2;       Portal HTTP         
+                                 web 172.21.0.10                                
+Rede do banco   172.22.0.0/24    Firewall 172.22.0.2;       Armazenamento       
+                                 PostgreSQL 172.22.0.20     isolado             
+WAN simulada    172.23.0.0/24    Firewall 172.23.0.2;       Origem externa      
+                                 pharmacy 172.23.0.10       de testes           
+--------------------------------------------------------------------------------
+Fonte: elaboração própria (2026).
+
+4 MATRIZ DE REGRAS DE SEGURANÇA DO FIREWALL
+
+     A tabela a seguir resume as regras de filtragem implementadas. A política
+DROP da cadeia FORWARD aplica-se ao tráfego encaminhado que não corresponda a
+uma permissão. Portanto, o bloqueio do acesso direto ao banco decorre da
+política padrão e da ausência de regra permissiva, não de uma regra DROP
+específica para a porta 5432.
+
+Tabela 2 – Matriz de regras do firewall
+--------------------------------------------------------------------------------
+Origem             Destino          Porta/protocolo Ação       Justificativa     
+--------------------------------------------------------------------------------
+LAN 172.20.0.0/24  Web/DMZ          TCP 80, NEW     ACCEPT     Acesso interno    
+                   172.21.0.10                                 ao portal.        
+WAN 172.23.0.0/24  Web/DMZ          TCP 80, NEW     ACCEPT     Acesso externo    
+                   172.21.0.10                                 simulado ao portal.
+Qualquer origem    Qualquer destino ESTABLISHED,    ACCEPT     Respostas e conexões
+encaminhada        encaminhado      RELATED                    autorizadas.      
+DMZ 172.21.0.0/24  LAN              Qualquer, NEW   DROP       Isolamento da DMZ;
+                   172.20.0.0/24                               bloqueia novas    
+                                                               conexões à LAN.   
+LAN 172.20.0.0/24  PostgreSQL       TCP 5432        DROP       Impedir acesso direto
+                   172.22.0.20                      implícito  do cliente ao banco.
+WAN 172.23.0.0/24  PostgreSQL       TCP 5432        DROP       Evitar exposição  
+                   172.22.0.20                      implícito  do banco à WAN.   
+Origem não         Qualquer destino Demais portas   DROP       Negar tráfego não 
+autorizada         encaminhado      e protocolos    padrão     previsto em regra.
+--------------------------------------------------------------------------------
+Fonte: elaboração própria (2026).
+
+     Isolamento da DMZ: o servidor Web localizado na DMZ não pode iniciar
+conexões em direção à rede interna (LAN). Essa restrição reduz o risco de que
+um servidor comprometido seja utilizado para acessar estações de trabalho
+internas. O firewall permite o tráfego de retorno de conexões previamente
+estabelecidas e autorizadas, mas não libera novas conexões originadas na DMZ
+em direção à Intranet.
+
+4.1 Tradução de endereços (SNAT)
+
+     Na tabela nat, cadeia POSTROUTING, há duas regras SNAT para TCP destinado a
+172.21.0.10:80. As origens 172.20.0.0/24 e 172.23.0.0/24 são traduzidas para
+172.21.0.2. SNAT não substitui as regras de filtragem da cadeia FORWARD.
+
+5 METODOLOGIA DE TESTES E VALIDAÇÃO
+
+5.1 Passo a passo para o avaliador
+
+     Executar os comandos no PowerShell, na raiz do repositório onde está o
+docker-compose.yml. O Docker Desktop deve estar em execução.
+
+  1. Verificar os serviços: docker compose ps.
+  2. Conferir encaminhamento e regras: docker compose exec firewall iptables -L FORWARD -n -v.
+  3. Conferir SNAT: docker compose exec firewall iptables -t nat -L POSTROUTING -n -v.
+  4. Testar HTTP pela WAN simulada: docker compose exec pharmacy wget -qO- http://172.21.0.10.
+  5. Testar HTTP pela LAN: docker compose exec client wget -qO- http://172.21.0.10.
+  6. Testar acesso da LAN ao PostgreSQL: docker compose exec client sh -c "nc -zvw 3 172.22.0.20 5432".
+  7. Consultar logs: docker compose logs --tail=50 firewall.
+
+5.2 Testes positivos
+
+Tabela 3 – Resultados dos testes positivos
+--------------------------------------------------------------------------------
+Teste            Procedimento         Resultado esperado   Resultado observado 
+--------------------------------------------------------------------------------
+HTTP pela WAN    wget no container    HTML do portal       Aprovado: HTML do   
+                 pharmacy p/                               portal retornado.   
+                 172.21.0.10                                                   
+HTTP pela LAN    wget no container    HTML do portal       Aprovado: HTML do   
+                 client p/                                 portal retornado.   
+                 172.21.0.10                                                   
+Regras SNAT      Listar cadeia        Duas regras para     Aprovado: 1 pacote  
+                 POSTROUTING          TCP/80               e 60 bytes cada.    
+Política         Listar cadeia        DROP e permissões    Aprovado: contadores
+FORWARD          FORWARD              HTTP explícitas      HTTP incrementados. 
+--------------------------------------------------------------------------------
+Fonte: elaboração própria (2026).
+
+5.3 Testes negativos
+
+Tabela 4 – Resultados dos testes negativos
+--------------------------------------------------------------------------------
+Teste                Procedimento         Resultado esperado Resultado observado
+--------------------------------------------------------------------------------
+LAN tenta acessar    nc -zvw 3            Conexão não        Aprovado: tentativa
+PostgreSQL           172.22.0.20 5432     estabelecida       expirou com       
+                     no container client                     "Operation timed out".
+Política             Consultar iptables   Pacotes sem        Aprovado: política
+restritiva           -L FORWARD -n -v     permissão descartados DROP e descartes  
+                                                             observados no contador.
+--------------------------------------------------------------------------------
+Fonte: elaboração própria (2026).
+
+     Nota metodológica: um timeout, isoladamente, não identifica a causa exata
+do bloqueio. O resultado foi analisado junto à política FORWARD DROP e à
+ausência de regra permissiva LAN → PostgreSQL. Para maior precisão, pode-se
+comparar os contadores antes e depois de cada teste ou capturar pacotes no
+firewall.
+
+5.4 Critérios de validação
+
+  - Firewall em execução, quatro interfaces visíveis e encaminhamento IPv4
+    habilitado (ip_forward = 1).
+  - LAN e WAN simulada recuperam o HTML do Nginx via TCP/80.
+  - As duas regras SNAT aparecem em POSTROUTING e seus contadores aumentam
+    após os acessos.
+  - A cadeia FORWARD permanece com política DROP e permissões HTTP explícitas.
+  - A tentativa de acesso direto da LAN ao PostgreSQL não estabelece conexão.
+
+6 CONSIDERAÇÕES FINAIS
+
+     O MedTech Firewall demonstrou, em laboratório com containers, a segmentação
+da rede em quatro zonas e o controle de tráfego com iptables. Os testes
+positivos confirmaram o acesso HTTP ao Nginx a partir da LAN e da WAN simulada.
+O teste negativo observou o bloqueio da tentativa de acesso direto do cliente ao
+PostgreSQL, em conformidade com a política restritiva configurada.
+
+     Como evolução, recomenda-se implementar uma aplicação web e uma API de
+backend que acessem o banco por uma regra específica e restrita, em vez de
+permitir acesso direto dos clientes. Em produção, também devem ser avaliados
+HTTPS/TLS, logs centralizados, atualização de imagens, gestão de segredos,
+backups, monitoramento e regras INPUT/OUTPUT.
+
+     Por ser um ambiente acadêmico demonstrativo, os resultados validam os
+fluxos testados, mas não representam isoladamente uma certificação de segurança
+de infraestrutura de produção.
+
+REFERÊNCIAS
+
+DOCKER. Docker Compose documentation. Disponível em:
+https://docs.docker.com/compose/. Acesso em: 12 out. 2026.
+
+NETFILTER PROJECT. iptables: administration tool for IPv4 packet filtering
+and NAT. Disponível em: https://www.netfilter.org/. Acesso em: 12 out. 2026.
+
+POSTGRESQL GLOBAL DEVELOPMENT GROUP. PostgreSQL documentation. Disponível em:
+https://www.postgresql.org/docs/. Acesso em: 12 out. 2026.
